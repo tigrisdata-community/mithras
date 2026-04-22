@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "skills": {
+    "conventional-commits": {
+      "source": "tigrisdata/skills",
+      "sourceType": "github",
+      "computedHash": "306552bc23618f5d446b8a4448cb5f32daa25d68ae1e47230aaa698f62c553d4"
+    },
+    "go-table-driven-tests": {
+      "source": "tigrisdata/skills",
+      "sourceType": "github",
+      "computedHash": "f549bddc1cc8b5a1c2910f8e2affd997d35c6f848a13fed0d21ea6796c683577"
+    },
+    "xe-go-style": {
+      "source": "xe/skills",
+      "sourceType": "github",
+      "computedHash": "c7b04ab7dad2971e56c77afc9e2c1eb1daf8066b6bebec55ce7a8a9f556402b0"
+    }
+  }
+}
