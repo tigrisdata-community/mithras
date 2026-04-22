@@ -10,8 +10,17 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero"
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
+	"github.com/tetratelabs/wazero/experimental/sysfs"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
+
+// wazeroMountable is satisfied by filesystems (like s3fs.S3FS) that can
+// expose themselves as a writeable wazero experimental/sys.FS. When
+// present we prefer the sys.FS mount so the guest can write back.
+type wazeroMountable interface {
+	AsWazeroFS() experimentalsys.FS
+}
 
 var (
 	//go:embed python.wasm
@@ -69,10 +78,17 @@ func Run(ctx context.Context, fsys fs.FS, userCode string) (*Result, error) {
 	}
 
 	// Mount the caller's filesystem at root and overlay the script
-	// directory at /.mithras.
-	fsConfig := wazero.NewFSConfig().
-		WithFSMount(fsys, "/").
-		WithDirMount(tmpDir, "/.mithras")
+	// directory at /.mithras. If the filesystem can hand us a writeable
+	// sys.FS (e.g. s3fs.S3FS), use that mount path so the guest's
+	// writes reach the backing store; otherwise fall back to the
+	// read-only WithFSMount adapter.
+	fsConfig := wazero.NewFSConfig()
+	if m, ok := fsys.(wazeroMountable); ok {
+		fsConfig = fsConfig.(sysfs.FSConfig).WithSysFSMount(m.AsWazeroFS(), "/")
+	} else {
+		fsConfig = fsConfig.WithFSMount(fsys, "/")
+	}
+	fsConfig = fsConfig.WithDirMount(tmpDir, "/.mithras")
 
 	config := wazero.NewModuleConfig().
 		// stdio
