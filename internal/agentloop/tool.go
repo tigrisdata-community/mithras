@@ -2,6 +2,7 @@ package agentloop
 
 import (
 	"context"
+	"io/fs"
 
 	"github.com/openai/openai-go/v3"
 )
@@ -24,6 +25,8 @@ type Tool interface {
 	// the model so it can retry with corrected arguments.
 	Valid(data []byte) (err error)
 	// Run executes the tool with the validated argument blob and returns
-	// the raw bytes to hand back to the model as the tool message.
-	Run(ctx context.Context, data []byte) ([]byte, error)
+	// the raw bytes to hand back to the model as the tool message. The
+	// fs argument is the filesystem configured on the owning [Impl] and
+	// may be nil if no filesystem was supplied.
+	Run(ctx context.Context, fs fs.FS, data []byte) ([]byte, error)
 }

@@ -254,7 +254,7 @@ func (i *Impl) Run(ctx context.Context, prompt string, opts ...func(*openai.Chat
 
 			lg.Debug("calling tool", "args", json.RawMessage(args))
 
-			toolResult, err := tool.Run(ctx, args)
+			toolResult, err := tool.Run(ctx, i.fs, args)
 			if err != nil {
 				switch {
 				case errors.Is(err, ErrSentinelOkay):
