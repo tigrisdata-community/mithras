@@ -72,7 +72,7 @@ func run() error {
 		webhookSecret = makeWebhookSecret(agent)
 	}
 
-	var result []any = make([]any, 0)
+	result := make([]any, 0)
 
 	cm, err := makeConfigMap(agent, credsSecret)
 	if err != nil {

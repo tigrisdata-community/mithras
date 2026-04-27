@@ -31,10 +31,13 @@ func main() {
 func run() error {
 	return json.NewEncoder(os.Stdout).Encode(v1alpha1.Airway{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "mithras.tigris.sh-v1alpha1-agent",
+			Name: "agents.mithras.tigris.sh",
 		},
 		Spec: v1alpha1.AirwaySpec{
 			ClusterAccess: true,
+			ResourceAccessMatchers: []string{
+				"Secret",
+			},
 			WasmURLs: v1alpha1.WasmURLs{
 				Flight: *flightURL,
 			},
