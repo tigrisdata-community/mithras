@@ -1,3 +1,6 @@
+// Package webhook implements the HTTP-facing pieces of the webhookd binary:
+// middleware, request handling, and per-request agent wiring. Configuration
+// loading lives in the [webhookconfig] subpackage.
 package webhook
 
 import (

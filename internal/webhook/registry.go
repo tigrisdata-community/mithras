@@ -1,11 +1,16 @@
 package webhook
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/tigrisdata-community/mithras/internal/agentloop"
 	pythontool "github.com/tigrisdata-community/mithras/internal/tools/python"
 )
+
+// ErrUnknownTool is returned by [SelectBuiltins] when a requested tool name is
+// not registered in [BuiltinTools].
+var ErrUnknownTool = errors.New("webhook: tool not in built-in registry")
 
 // BuiltinTools returns a fresh map of the tools that ship with mithras, keyed
 // by the name the model sees. The map is newly allocated per call so callers

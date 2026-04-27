@@ -1,4 +1,4 @@
-package webhook
+package webhookconfig
 
 import (
 	"errors"
@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func TestParseConfig(t *testing.T) {
+func TestParse(t *testing.T) {
 	t.Parallel()
 
 	minimal := `
@@ -22,11 +22,11 @@ tools:
 `
 
 	tests := []struct {
-		name         string
-		input        string
-		wantErr      error
+		name          string
+		input         string
+		wantErr       error
 		wantErrSubstr string
-		check        func(t *testing.T, cfg *Config)
+		check         func(t *testing.T, cfg *Config)
 	}{
 		{
 			name:  "minimal valid config",
@@ -197,7 +197,7 @@ parallelToolCalls: true
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			cfg, err := ParseConfig([]byte(tt.input))
+			cfg, err := Parse([]byte(tt.input))
 			switch {
 			case tt.wantErr != nil:
 				if !errors.Is(err, tt.wantErr) {

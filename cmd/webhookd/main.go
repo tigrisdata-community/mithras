@@ -30,6 +30,7 @@ import (
 	mcpclient "github.com/tigrisdata-community/mithras/internal/mcp"
 	"github.com/tigrisdata-community/mithras/internal/s3fs"
 	"github.com/tigrisdata-community/mithras/internal/webhook"
+	"github.com/tigrisdata-community/mithras/internal/webhook/webhookconfig"
 )
 
 var (
@@ -58,7 +59,7 @@ func run(ctx context.Context, lg *slog.Logger) error {
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	cfg, err := webhook.LoadConfig(*configPath)
+	cfg, err := webhookconfig.Load(*configPath)
 	if err != nil {
 		return err
 	}
@@ -189,7 +190,7 @@ func newLogger(level string) *slog.Logger {
 	return slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: lvl}))
 }
 
-func newS3Client(ctx context.Context, s3cfg webhook.S3Config) (*s3.Client, error) {
+func newS3Client(ctx context.Context, s3cfg webhookconfig.S3Config) (*s3.Client, error) {
 	awsCfg, err := awsconfig.LoadDefaultConfig(ctx,
 		awsconfig.WithRegion(s3cfg.EffectiveRegion()),
 	)
@@ -203,7 +204,7 @@ func newS3Client(ctx context.Context, s3cfg webhook.S3Config) (*s3.Client, error
 	}), nil
 }
 
-func toMCPSpecs(in []webhook.MCPServer) []mcpclient.ServerSpec {
+func toMCPSpecs(in []webhookconfig.MCPServer) []mcpclient.ServerSpec {
 	out := make([]mcpclient.ServerSpec, 0, len(in))
 	for _, s := range in {
 		out = append(out, mcpclient.ServerSpec{

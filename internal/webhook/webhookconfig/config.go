@@ -1,6 +1,6 @@
-// Package webhook implements the HTTP-facing pieces of the webhookd binary:
-// config loading, middleware, request handling, and per-request agent wiring.
-package webhook
+// Package webhookconfig parses and validates the on-disk YAML config consumed
+// by the webhookd binary.
+package webhookconfig
 
 import (
 	"bytes"
@@ -15,10 +15,9 @@ import (
 )
 
 var (
-	ErrInvalidTransport = errors.New("webhook: mcp server has unknown transport")
-	ErrMissingField     = errors.New("webhook: required field is missing")
-	ErrInvalidValue     = errors.New("webhook: invalid configuration value")
-	ErrUnknownTool      = errors.New("webhook: tool not in built-in registry")
+	ErrInvalidTransport = errors.New("webhookconfig: mcp server has unknown transport")
+	ErrMissingField     = errors.New("webhookconfig: required field is missing")
+	ErrInvalidValue     = errors.New("webhookconfig: invalid configuration value")
 )
 
 // Config is the on-disk shape of the ConfigMap.
@@ -87,25 +86,25 @@ type MCPServer struct {
 	Env       map[string]string `yaml:"env"`
 }
 
-// LoadConfig reads and validates the ConfigMap file at path.
-func LoadConfig(path string) (*Config, error) {
+// Load reads and validates the ConfigMap file at path.
+func Load(path string) (*Config, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("webhook: reading config: %w", err)
+		return nil, fmt.Errorf("webhookconfig: reading config: %w", err)
 	}
 
-	return ParseConfig(raw)
+	return Parse(raw)
 }
 
-// ParseConfig parses and validates a raw YAML document. It performs env-var
+// Parse parses and validates a raw YAML document. It performs env-var
 // expansion on MCP server env values before returning. Unknown fields are
 // rejected so typos surface as errors rather than silent no-ops.
-func ParseConfig(data []byte) (*Config, error) {
+func Parse(data []byte) (*Config, error) {
 	var cfg Config
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	if err := dec.Decode(&cfg); err != nil {
-		return nil, fmt.Errorf("webhook: parsing config: %w", err)
+		return nil, fmt.Errorf("webhookconfig: parsing config: %w", err)
 	}
 
 	for i := range cfg.MCPServers {
@@ -147,7 +146,7 @@ func (c *Config) Valid() error {
 			continue
 		}
 		if _, dup := names[srv.Name]; dup {
-			errs = append(errs, fmt.Errorf("webhook: duplicate mcp server name %q", srv.Name))
+			errs = append(errs, fmt.Errorf("webhookconfig: duplicate mcp server name %q", srv.Name))
 			continue
 		}
 		names[srv.Name] = struct{}{}
@@ -171,7 +170,7 @@ func (c *Config) Valid() error {
 	}
 
 	if len(errs) != 0 {
-		return fmt.Errorf("webhook: invalid config:\n%w", errors.Join(errs...))
+		return fmt.Errorf("webhookconfig: invalid config:\n%w", errors.Join(errs...))
 	}
 	return nil
 }
