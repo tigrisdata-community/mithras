@@ -1,0 +1,21 @@
+apiVersion: mithras.tigris.sh/v1alpha1
+kind: Agent
+
+metadata:
+  name: sample
+
+spec:
+  model: qwen-3.6-36b
+  credsSecret: zohar-llm-creds
+  systemPrompt: |
+    You are a helpful assistant.
+
+    Whenever you are asked to count things or do tasks relating to math, you MUST use the `python` tool to accomplish this task.
+  bucket: xe-mithras-sample
+  tools:
+    - python
+  perRequestTimeout: 1m
+
+  ingress:
+    host: "sample.local.cetacean.club"
+    class: "traefik"

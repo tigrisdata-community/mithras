@@ -1,0 +1,7 @@
+apiVersion: mithras.tigris.sh/v1alpha1
+kind: Agent
+
+metadata:
+  name: invalid
+
+spec: {}
