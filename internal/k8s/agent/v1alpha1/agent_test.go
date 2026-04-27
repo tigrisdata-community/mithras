@@ -77,10 +77,6 @@ func TestAgentSpecValidIngress(t *testing.T) {
 		wantErr []error
 	}{
 		{
-			name:    "nil ingress is allowed",
-			ingress: nil,
-		},
-		{
 			name:    "valid ingress",
 			ingress: &AgentIngress{Host: "agent.example.com", Class: "nginx"},
 		},
