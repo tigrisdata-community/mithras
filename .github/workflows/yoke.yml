@@ -29,7 +29,7 @@ jobs:
 
       - name: Build and push agent v1alpha1 CRDs
         run: |
-          go install github.com/yokecd/yoke/cmd/yoke
+          go install github.com/yokecd/yoke/cmd/yoke@latest
 
           cd ./internal/k8s/agent/v1alpha1
           ./push.sh
