@@ -82,8 +82,8 @@ func openFileWrite(cl Client, bucket, name string) (*file, error) {
 	uploadCh := make(chan error, 1)
 
 	go func() {
-		uploader := manager.NewUploader(cl)
-		_, err := uploader.Upload(context.Background(), &s3.PutObjectInput{
+		uploader := manager.NewUploader(cl) //nolint:staticcheck // SA1019: transfermanager migration is a separate task
+		_, err := uploader.Upload(context.Background(), &s3.PutObjectInput{ //nolint:staticcheck // SA1019
 			Bucket: &bucket,
 			Key:    &name,
 			Body:   pr,

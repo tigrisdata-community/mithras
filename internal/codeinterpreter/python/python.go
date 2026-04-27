@@ -71,7 +71,7 @@ func Run(ctx context.Context, fsys fs.FS, userCode string) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	if err := os.WriteFile(filepath.Join(tmpDir, "main.py"), []byte(userCode), 0644); err != nil {
 		return nil, err
@@ -114,7 +114,7 @@ func Run(ctx context.Context, fsys fs.FS, userCode string) (*Result, error) {
 		return result, err
 	}
 
-	defer mod.Close(ctx)
+	defer func() { _ = mod.Close(ctx) }()
 
 	return &Result{
 		Stdout: fout.String(),

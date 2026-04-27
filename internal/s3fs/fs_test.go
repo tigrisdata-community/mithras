@@ -696,7 +696,7 @@ func TestFS(t *testing.T) {
 				if err != nil {
 					t.Fatal("expected err to be nil")
 				}
-				defer f.Close()
+				defer func() { _ = f.Close() }()
 
 				fi, err := f.Stat()
 				if err != nil {
@@ -1006,7 +1006,7 @@ func TestFS(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					defer f.Close()
+					defer func() { _ = f.Close() }()
 
 					dir, ok := f.(fs.ReadDirFile)
 					if !ok {
@@ -1308,8 +1308,8 @@ func newClient(t *testing.T) (*s3.Client, Client) {
 func writeFile(t *testing.T, cl *s3.Client, bucket, name string, data []byte) {
 	t.Helper()
 
-	uploader := manager.NewUploader(cl)
-	_, err := uploader.Upload(context.Background(), &s3.PutObjectInput{
+	uploader := manager.NewUploader(cl) //nolint:staticcheck // SA1019
+	_, err := uploader.Upload(context.Background(), &s3.PutObjectInput{ //nolint:staticcheck // SA1019
 		Body:   strings.NewReader(string(data)),
 		Bucket: &bucket,
 		Key:    &name,

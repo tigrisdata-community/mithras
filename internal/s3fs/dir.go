@@ -97,8 +97,8 @@ func (d *dir) readNext() error {
 	}
 
 	name := strings.TrimRight(d.name, "/")
-	switch {
-	case name == ".":
+	switch name {
+	case ".":
 		name = ""
 	default:
 		name += "/"
