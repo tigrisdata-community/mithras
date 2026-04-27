@@ -127,6 +127,11 @@ func (w *wazeroReadFile) Read(buf []byte) (int, sysexp.Errno) {
 	return n, 0
 }
 
+// Seek implements sys.File. The signature intentionally returns sys.Errno
+// to satisfy wazero's experimental/sys.File contract, which conflicts with
+// the io.Seeker shape that go vet's stdmethods analyzer expects.
+//
+//nolint:stdmethods
 func (w *wazeroReadFile) Seek(offset int64, whence int) (int64, sysexp.Errno) {
 	s, ok := w.f.(io.Seeker)
 	if !ok {
