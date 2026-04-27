@@ -170,7 +170,7 @@ func makeDeployment(a agentv1alpha1.Agent) *appsv1.Deployment {
 					Containers: []corev1.Container{
 						{
 							Name:            "webhookd",
-							Image:           "ghcr.io/tigrisdata-community/mithras/webhookd:v1alpha1",
+							Image:           "ghcr.io/tigrisdata-community/mithras/webhookd:latest",
 							ImagePullPolicy: corev1.PullAlways,
 							SecurityContext: &corev1.SecurityContext{
 								RunAsUser:                ptr.To[int64](1000),
