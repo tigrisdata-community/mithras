@@ -202,6 +202,13 @@ func makeDeployment(a agentv1alpha1.Agent) *appsv1.Deployment {
 										},
 									},
 								},
+								{
+									SecretRef: &corev1.SecretEnvSource{
+										LocalObjectReference: corev1.LocalObjectReference{
+											Name: a.Name + "-webhook-secret",
+										},
+									},
+								},
 							},
 							Ports: []corev1.ContainerPort{
 								{
