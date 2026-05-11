@@ -4,8 +4,6 @@ go 1.26.2
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.41.7
-	github.com/aws/aws-sdk-go-v2/config v1.32.17
-	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.15
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.100.1
 	github.com/facebookgo/flagenv v0.0.0-20160425205200-fcd59fca7456
 	github.com/go-git/go-billy/v5 v5.8.0
@@ -15,6 +13,7 @@ require (
 	github.com/openai/openai-go/v3 v3.32.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/tetratelabs/wazero v1.11.0
+	github.com/tigrisdata/storage-go v0.6.0
 	github.com/yokecd/yoke v0.20.12
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.36.0
@@ -22,7 +21,7 @@ require (
 	k8s.io/apimachinery v0.36.0
 	k8s.io/utils v0.0.0-20260319190234-28399d86e0b5
 	mvdan.cc/sh/v3 v3.13.1
-	tangled.org/xeiaso.net/kefka v0.0.3
+	tangled.org/xeiaso.net/kefka v0.0.4-0.20260506154516-b553277e9423
 )
 
 require (
@@ -30,6 +29,7 @@ require (
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.10 // indirect
+	github.com/aws/aws-sdk-go-v2/config v1.32.17 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.16 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.23 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.23 // indirect
@@ -106,6 +106,7 @@ require (
 	github.com/xlab/treeprint v1.2.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
+	go.uber.org/atomic v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/mod v0.34.0 // indirect

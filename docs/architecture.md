@@ -22,14 +22,16 @@ internal/agentloop.Impl  ──── tools ────►  internal/tools/pyth
         │                                  internal/mcp adapters
         │
         ▼
-internal/s3fs.S3FS        (mounted at "/" inside the WASI guest)
+kefka/s3fs                (per-request fork mounted at "/" inside the WASI guest)
 ```
 
 A POST to `/v1/invoke` is authenticated, the body is captured, and a
-goroutine is spawned that builds a fresh `agentloop.Impl` and drives it to
-completion against the configured model and tool set. The S3 bucket is
-mounted writable inside the Python sandbox so user code can read and write
-objects directly.
+goroutine is spawned that forks the configured source bucket into
+`<bucket>-<requestID>`, builds a fresh `agentloop.Impl` against that fork,
+and drives it to completion against the configured model and tool set. The
+fork is force-deleted via `Tigris-Force-Delete: true` once the runner
+returns so nothing persists between invocations. User code in the Python
+sandbox can read and write the fork directly.
 
 ## Packages
 
@@ -110,24 +112,11 @@ three transports: `stdio`, `streamable-http`, and `sse`. `Pool` owns a
 collection of live clients; tool names are namespaced with the server name
 to prevent collisions.
 
-### `internal/s3fs`
+### `tangled.org/xeiaso.net/kefka/s3fs`
 
-Fork of `jszwec/s3fs` (vendored as an internal package, original license
-preserved) extended with write support. `S3FS` implements `fs.FS`,
-`fs.StatFS`, `fs.ReadDirFS` plus the package-local `CreateFS`,
-`WriteFileFS`, `RemoveFS`, `MkdirAllFS` interfaces. S3 is flat;
-directories are simulated with `/`-delimited prefixes and zero-byte
-marker objects written by `MkdirAll`.
-
-`(*S3FS).AsBilly()` (in `billy.go`) returns a `billy.Filesystem` view of
-the same bucket. The agent loop and Python sandbox consume this view —
-writes through the billy interface land directly in S3. S3 has no
-symlinks, no chmod, and no rename primitive, so `Chroot` is a no-op and
-the symlink/`Rename`/`TempFile`/`Truncate` paths return
-`billy.ErrNotSupported`.
-
-Tests are **integration tests that hit a real S3-compatible endpoint** —
-see `AGENTS.md` for the invocation.
+External `billy.Filesystem` over an S3 bucket. The runner constructs one
+per request against the freshly-forked session bucket and hands it to
+`agentloop.Impl` as `FS`. Replaces a previous internal `s3fs` fork.
 
 ### `internal/tools/python`
 
@@ -190,10 +179,12 @@ cluster. `sample.yaml` and `provider-secret.yaml` are example resources.
 
 ## Composition
 
-The intended stack: an `agentloop.Impl` is constructed with `FS:
-s3fs.New(...).AsBilly()` and `Tools` containing `pythontool.Impl{}` plus
-any MCP adapters from a connected `mcp.Pool`. When the model calls the
-python tool, user code runs in a WASI sandbox with the S3 bucket mounted
-at `/` and can both read and write objects directly. `cmd/webhookd` is
-the production assembly of this stack; the operator side
-(`internal/k8s/agent/v1alpha1`) packages it as a Kubernetes CRD.
+The intended stack: per invocation the runner forks `RunnerDeps.SourceBucket`
+into a per-request fork, builds a `kefka/s3fs` over it, and constructs
+`agentloop.Impl` with that `billy.Filesystem` as `FS` plus `Tools`
+containing the built-in tools and any MCP adapters from a connected
+`mcp.Pool`. When the model calls the python tool, user code runs in a
+WASI sandbox with the forked bucket mounted at `/` and can read and write
+objects directly; on completion the fork is force-deleted.
+`cmd/webhookd` is the production assembly of this stack; the operator
+side (`internal/k8s/agent/v1alpha1`) packages it as a Kubernetes CRD.

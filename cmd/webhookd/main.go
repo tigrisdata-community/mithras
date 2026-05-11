@@ -19,16 +19,14 @@ import (
 	"syscall"
 	"time"
 
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/facebookgo/flagenv"
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/tigrisdata/storage-go"
 
 	"github.com/tigrisdata-community/mithras/internal/agentloop"
 	mcpclient "github.com/tigrisdata-community/mithras/internal/mcp"
-	"github.com/tigrisdata-community/mithras/internal/s3fs"
 	"github.com/tigrisdata-community/mithras/internal/webhook"
 	"github.com/tigrisdata-community/mithras/internal/webhook/webhookconfig"
 )
@@ -78,11 +76,10 @@ func run(ctx context.Context, lg *slog.Logger) error {
 		option.WithBaseURL(cfg.ProviderBaseURL),
 	)
 
-	s3Cli, err := newS3Client(ctx, cfg.S3)
+	storageCli, err := newStorageClient(ctx, cfg.S3)
 	if err != nil {
-		return fmt.Errorf("build s3 client: %w", err)
+		return fmt.Errorf("build storage client: %w", err)
 	}
-	fsys := s3fs.New(s3Cli, cfg.Bucket).AsBilly()
 
 	tools, err := webhook.SelectBuiltins(cfg.Tools)
 	if err != nil {
@@ -100,17 +97,21 @@ func run(ctx context.Context, lg *slog.Logger) error {
 	}()
 	tools = append(tools, pool.Tools()...)
 
-	runner := webhook.NewAgentRunner(webhook.RunnerDeps{
+	runner, err := webhook.NewAgentRunner(webhook.RunnerDeps{
 		AgentName:         cfg.AgentName,
 		Model:             cfg.Model,
 		SystemPrompt:      cfg.SystemPrompt,
 		Client:            openaiCli,
-		FS:                fsys,
+		Storage:           storageCli,
+		SourceBucket:      cfg.Bucket,
 		Tools:             tools,
 		Logger:            lg,
 		PerRequestTimeout: cfg.PerRequestTimeout,
 		ParallelToolCalls: cfg.EffectiveParallelToolCalls(),
 	})
+	if err != nil {
+		return fmt.Errorf("build agent runner: %w", err)
+	}
 
 	// ctx is the SIGTERM-driven context used for the HTTP server lifecycle;
 	// drainCtx is the long-lived context handed to in-flight agent goroutines
@@ -190,18 +191,12 @@ func newLogger(level string) *slog.Logger {
 	return slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: lvl}))
 }
 
-func newS3Client(ctx context.Context, s3cfg webhookconfig.S3Config) (*s3.Client, error) {
-	awsCfg, err := awsconfig.LoadDefaultConfig(ctx,
-		awsconfig.WithRegion(s3cfg.EffectiveRegion()),
+func newStorageClient(ctx context.Context, s3cfg webhookconfig.S3Config) (*storage.Client, error) {
+	return storage.New(ctx,
+		storage.WithEndpoint(s3cfg.EffectiveEndpoint()),
+		storage.WithRegion(s3cfg.EffectiveRegion()),
+		storage.WithPathStyle(s3cfg.EffectivePathStyle()),
 	)
-	if err != nil {
-		return nil, err
-	}
-	endpoint := s3cfg.EffectiveEndpoint()
-	return s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.BaseEndpoint = &endpoint
-		o.UsePathStyle = s3cfg.EffectivePathStyle()
-	}), nil
 }
 
 func toMCPSpecs(in []webhookconfig.MCPServer) []mcpclient.ServerSpec {

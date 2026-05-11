@@ -25,19 +25,11 @@ go test ./internal/codeinterpreter/python -run TestRunWritesToRoot -v
 
 Use `go doc` to find documentation for Go packages. For example: `go doc github.com/mitchellh/go-libghostty`. Full syntax is `go doc [<pkg>.][<sym>.]<methodOrField>` for full help output.
 
-`internal/s3fs` tests are **integration tests that hit a real S3-compatible endpoint**. They require `-endpoint` and `-bucket` flags and credentials in the environment. Example against Tigris:
-
-```
-AWS_PROFILE=tigris-dev go test -count=1 -timeout=5m ./internal/s3fs/... \
-  -endpoint=https://fly.storage.tigris.dev -bucket=xe-mithras-s3fs-test
-```
-
-The test bucket must already exist and be writable. Tests create and clean their own keys but reuse the bucket.
-
 ## Architecture
 
-The library composes bottom-up: a writable S3-backed `fs.FS`
-(`internal/s3fs`), a Python WASI sandbox that mounts that fs at `/`
+The library composes bottom-up: an external writable S3 `billy.Filesystem`
+(`tangled.org/xeiaso.net/kefka/s3fs`) over a per-request bucket fork, a
+Python WASI sandbox that mounts that fs at `/`
 (`internal/codeinterpreter/python`), an OpenAI tool-calling loop that
 hands the fs to its tools (`internal/agentloop`), and an HTTP webhook
 front-end that ties it all together (`cmd/webhookd` and
