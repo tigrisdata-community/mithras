@@ -8,24 +8,46 @@ import (
 	"net"
 	"net/http"
 	"runtime/debug"
+	"strings"
 )
 
 // ErrHijackNotSupported is returned by [statusRecorder.Hijack] when the wrapped
 // [http.ResponseWriter] does not implement [http.Hijacker].
 var ErrHijackNotSupported = errors.New("webhook: underlying ResponseWriter does not support hijacking")
 
-// requireToken returns middleware that 401s any request whose X-Mithras-Token
-// header does not equal secret. Comparison is constant time.
+// requireToken returns middleware that 401s any request whose
+// "Authorization: Bearer <token>" header does not equal secret. The scheme
+// match is case-insensitive per RFC 7235; the token comparison is constant
+// time.
 func requireToken(secret string, lg *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		got := r.Header.Get("X-Mithras-Token")
-		if subtle.ConstantTimeCompare([]byte(got), []byte(secret)) != 1 {
+		token, ok := bearerToken(r.Header.Get("Authorization"))
+		if !ok || subtle.ConstantTimeCompare([]byte(token), []byte(secret)) != 1 {
 			lg.Warn("rejected unauthenticated request", "path", r.URL.Path, "remote", r.RemoteAddr)
+			w.Header().Set("WWW-Authenticate", `Bearer realm="mithras"`)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// bearerToken parses the value of the Authorization header and returns the
+// token portion when the scheme is Bearer. The second return is false when
+// the header is missing, malformed, or uses a different scheme.
+func bearerToken(authHeader string) (string, bool) {
+	const prefix = "Bearer "
+	if len(authHeader) < len(prefix) {
+		return "", false
+	}
+	if !strings.EqualFold(authHeader[:len(prefix)], prefix) {
+		return "", false
+	}
+	token := strings.TrimSpace(authHeader[len(prefix):])
+	if token == "" {
+		return "", false
+	}
+	return token, true
 }
 
 // recover500 converts panics in downstream handlers into a 500 response and

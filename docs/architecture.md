@@ -143,8 +143,9 @@ HTTP-facing pieces of `webhookd`:
 
 - `Router` wires `POST /v1/invoke` (auth-required) and `GET /healthz`,
   with `recover500` and `requestLog` middleware on top.
-- `requireToken` does constant-time comparison of the `X-Mithras-Token`
-  header against the shared secret.
+- `requireToken` extracts the token from an `Authorization: Bearer …`
+  header and constant-time compares it against the shared secret. Failed
+  requests get a `WWW-Authenticate: Bearer realm="mithras"` response.
 - `AgentRunner` builds a fresh `agentloop.Impl` per request so conversation
   histories do not bleed between webhooks.
 - `BackgroundLauncher` spawns each runner call on a `sync.WaitGroup` so

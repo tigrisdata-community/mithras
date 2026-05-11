@@ -165,7 +165,7 @@ func TestInvokeHandler(t *testing.T) {
 				req.Header.Set("Content-Type", tt.contentType)
 			}
 			if tt.token != "" {
-				req.Header.Set("X-Mithras-Token", tt.token)
+				req.Header.Set("Authorization", "Bearer "+tt.token)
 			}
 			rec := httptest.NewRecorder()
 			h.ServeHTTP(rec, req)
@@ -200,6 +200,68 @@ func TestInvokeHandler(t *testing.T) {
 	}
 }
 
+func TestInvokeHandler_authorizationHeader(t *testing.T) {
+	t.Parallel()
+
+	const secret = "s3kret"
+
+	for _, tt := range []struct {
+		name       string
+		header     string
+		wantStatus int
+	}{
+		{
+			name:       "missing header is 401",
+			header:     "",
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			name:       "wrong scheme is 401",
+			header:     "Basic " + secret,
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			name:       "bearer without token is 401",
+			header:     "Bearer ",
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			name:       "case-insensitive scheme accepted",
+			header:     "bearer " + secret,
+			wantStatus: http.StatusAccepted,
+		},
+		{
+			name:       "valid bearer accepted",
+			header:     "Bearer " + secret,
+			wantStatus: http.StatusAccepted,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, h := newTestRouter(t, secret, 1<<20)
+			req := httptest.NewRequest(http.MethodPost, "/v1/invoke", bytes.NewBufferString(`{}`))
+			req.Header.Set("Content-Type", "application/json")
+			if tt.header != "" {
+				req.Header.Set("Authorization", tt.header)
+			}
+
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+
+			if rec.Code != tt.wantStatus {
+				t.Fatalf("status = %d, want %d (body=%s)", rec.Code, tt.wantStatus, rec.Body.String())
+			}
+
+			if rec.Code == http.StatusUnauthorized {
+				if got := rec.Header().Get("WWW-Authenticate"); got == "" {
+					t.Error("missing WWW-Authenticate header on 401")
+				}
+			}
+		})
+	}
+}
+
 func TestInvokeHandler_bodyTooLarge(t *testing.T) {
 	t.Parallel()
 
@@ -209,7 +271,7 @@ func TestInvokeHandler_bodyTooLarge(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/invoke",
 		bytes.NewBufferString(`{"pad":"`+big+`"}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Mithras-Token", "x")
+	req.Header.Set("Authorization", "Bearer x")
 
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)

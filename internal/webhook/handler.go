@@ -26,8 +26,8 @@ type InvokeResponse struct {
 
 // Router returns an http.Handler wired up for the webhookd service.
 //
-// secret is the shared value required in the X-Mithras-Token header on
-// /v1/invoke. maxBody caps request bodies (in bytes).
+// secret is the shared value required in the Authorization: Bearer header
+// on /v1/invoke. maxBody caps request bodies (in bytes).
 func Router(launcher Launcher, secret string, maxBody int64, lg *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 
