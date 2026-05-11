@@ -82,7 +82,7 @@ func run(ctx context.Context, lg *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("build s3 client: %w", err)
 	}
-	fsys := s3fs.New(s3Cli, cfg.Bucket)
+	fsys := s3fs.New(s3Cli, cfg.Bucket).AsBilly()
 
 	tools, err := webhook.SelectBuiltins(cfg.Tools)
 	if err != nil {

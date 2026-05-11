@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/fs"
 
+	"github.com/go-git/go-billy/v5"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/openai/openai-go/v3"
 )
@@ -49,9 +49,9 @@ func (a *ToolAdapter) Valid(data []byte) error {
 }
 
 // Run calls the underlying MCP tool and returns the result as JSON so the
-// agent loop can hand it back to the model. fs is ignored: MCP servers manage
-// their own file access.
-func (a *ToolAdapter) Run(ctx context.Context, _ fs.FS, data []byte) ([]byte, error) {
+// agent loop can hand it back to the model. fsys is ignored: MCP servers
+// manage their own file access.
+func (a *ToolAdapter) Run(ctx context.Context, _ billy.Filesystem, data []byte) ([]byte, error) {
 	var args map[string]any
 	if len(data) > 0 {
 		if err := json.Unmarshal(data, &args); err != nil {

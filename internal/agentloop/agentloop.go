@@ -13,11 +13,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
 	"log/slog"
 	"sync"
 	"time"
 
+	"github.com/go-git/go-billy/v5"
 	"github.com/google/uuid"
 	"github.com/openai/openai-go/v3"
 	"github.com/prometheus/client_golang/prometheus"
@@ -64,7 +64,7 @@ type Impl struct {
 	model string
 	cli   openai.Client
 	lg    *slog.Logger
-	fs    fs.FS
+	fs    billy.Filesystem
 
 	messages []openai.ChatCompletionMessageParamUnion
 	lock     sync.Mutex
@@ -90,8 +90,8 @@ type Options struct {
 	// Logger receives structured log output from the loop.
 	Logger *slog.Logger
 	// FS is an optional filesystem made available to tools that need
-	// read-only file access.
-	FS fs.FS
+	// file access. Tools may write back through the billy interface.
+	FS billy.Filesystem
 }
 
 // New constructs an [Impl] from opts. If opts.ID is empty, a UUIDv7 is

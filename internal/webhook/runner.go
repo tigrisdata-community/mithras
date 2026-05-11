@@ -3,11 +3,11 @@ package webhook
 import (
 	"context"
 	"errors"
-	"io/fs"
 	"log/slog"
 	"sync"
 	"time"
 
+	"github.com/go-git/go-billy/v5"
 	"github.com/openai/openai-go/v3"
 	"github.com/tigrisdata-community/mithras/internal/agentloop"
 )
@@ -29,7 +29,7 @@ type RunnerDeps struct {
 	Model             string
 	SystemPrompt      string
 	Client            openai.Client
-	FS                fs.FS
+	FS                billy.Filesystem
 	Tools             []agentloop.Tool
 	Logger            *slog.Logger
 	PerRequestTimeout time.Duration

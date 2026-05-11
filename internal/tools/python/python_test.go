@@ -6,7 +6,9 @@ import (
 	"errors"
 	"strings"
 	"testing"
-	"testing/fstest"
+
+	"github.com/go-git/go-billy/v5/memfs"
+	"github.com/go-git/go-billy/v5/util"
 
 	"github.com/tigrisdata-community/mithras/internal/agentloop"
 	cipython "github.com/tigrisdata-community/mithras/internal/codeinterpreter/python"
@@ -105,9 +107,12 @@ func TestImplValid(t *testing.T) {
 func TestImplRun(t *testing.T) {
 	t.Parallel()
 
-	fsys := fstest.MapFS{
-		"greeting.txt": &fstest.MapFile{Data: []byte("hello from the imaginary filesystem")},
-		"numbers.txt":  &fstest.MapFile{Data: []byte("1\n2\n3\n")},
+	fsys := memfs.New()
+	if err := util.WriteFile(fsys, "greeting.txt", []byte("hello from the imaginary filesystem"), 0644); err != nil {
+		t.Fatalf("seed memfs: %v", err)
+	}
+	if err := util.WriteFile(fsys, "numbers.txt", []byte("1\n2\n3\n"), 0644); err != nil {
+		t.Fatalf("seed memfs: %v", err)
 	}
 
 	for _, tt := range []struct {

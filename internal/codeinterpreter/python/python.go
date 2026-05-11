@@ -4,23 +4,17 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
-	"io/fs"
+	"errors"
 	"os"
 	"path/filepath"
-	"time"
 
+	"github.com/go-git/go-billy/v5"
+	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/tetratelabs/wazero"
-	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
 	"github.com/tetratelabs/wazero/experimental/sysfs"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"tangled.org/xeiaso.net/kefka/wasm/billyfs"
 )
-
-// wazeroMountable is satisfied by filesystems (like s3fs.S3FS) that can
-// expose themselves as a writeable wazero experimental/sys.FS. When
-// present we prefer the sys.FS mount so the guest can write back.
-type wazeroMountable interface {
-	AsWazeroFS() experimentalsys.FS
-}
 
 var (
 	//go:embed python.wasm
@@ -50,18 +44,20 @@ type Result struct {
 }
 
 // mainPyPath is the path where the generated main.py is placed in the
-// guest filesystem. The caller's fs.FS is mounted at /, and a host temp
-// directory holding this file is overlaid at /.mithras.
+// guest filesystem. The caller's billy.Filesystem is mounted at /, and a
+// host temp directory holding this file is overlaid at /.mithras.
 const mainPyPath = "/.mithras/main.py"
 
-func Run(ctx context.Context, fsys fs.FS, userCode string) (*Result, error) {
+// Run executes userCode inside a Python WASI sandbox. The caller-supplied
+// fsys is mounted at the guest root; if nil, an in-memory billy filesystem
+// is used so the guest sees an empty /.
+func Run(ctx context.Context, fsys billy.Filesystem, userCode string) (*Result, error) {
 	fout := &bytes.Buffer{}
 	ferr := &bytes.Buffer{}
 	fin := &bytes.Buffer{}
 
-	// If fsys is nil, use an empty filesystem.
 	if fsys == nil {
-		fsys = emptyFS{}
+		fsys = memfs.New()
 	}
 
 	// Stage main.py in a host temp directory that will be mounted at
@@ -77,18 +73,15 @@ func Run(ctx context.Context, fsys fs.FS, userCode string) (*Result, error) {
 		return nil, err
 	}
 
-	// Mount the caller's filesystem at root and overlay the script
-	// directory at /.mithras. If the filesystem can hand us a writeable
-	// sys.FS (e.g. s3fs.S3FS), use that mount path so the guest's
-	// writes reach the backing store; otherwise fall back to the
-	// read-only WithFSMount adapter.
-	fsConfig := wazero.NewFSConfig()
-	if m, ok := fsys.(wazeroMountable); ok {
-		fsConfig = fsConfig.(sysfs.FSConfig).WithSysFSMount(m.AsWazeroFS(), "/")
-	} else {
-		fsConfig = fsConfig.WithFSMount(fsys, "/")
-	}
-	fsConfig = fsConfig.WithDirMount(tmpDir, "/.mithras")
+	// Mount the caller's billy filesystem at root via kefka's billyfs
+	// adapter (which implements wazero's experimental/sys.FS), and overlay
+	// the script directory at /.mithras. The dirAwareFS shim teaches the
+	// underlying billy filesystem to satisfy OpenFile(".", O_RDONLY) — the
+	// call wazero issues to materialize the preopen — instead of failing
+	// the way memfs and other directory-rejecting billy backends do.
+	fsConfig := wazero.NewFSConfig().(sysfs.FSConfig).
+		WithSysFSMount(billyfs.New(dirAwareFS{Filesystem: fsys}), "/").
+		WithDirMount(tmpDir, "/.mithras")
 
 	config := wazero.NewModuleConfig().
 		// stdio
@@ -122,39 +115,44 @@ func Run(ctx context.Context, fsys fs.FS, userCode string) (*Result, error) {
 	}, nil
 }
 
-// emptyFS is a filesystem whose root directory exists but is empty. Every
-// other path returns ENOENT. Mounting this at / lets the guest walk the
-// root while ensuring no caller-supplied files are visible.
-type emptyFS struct{}
-
-func (emptyFS) Open(name string) (fs.File, error) {
-	if name == "." {
-		return emptyDir{}, nil
-	}
-	return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
+// dirAwareFS wraps a billy.Filesystem so OpenFile on a directory returns a
+// minimal billy.File instead of erroring. The underlying call paths (memfs,
+// chroot helper, etc.) refuse directory opens through OpenFile; wazero's WASI
+// preopen plumbing relies on OpenFile(".", O_RDONLY) succeeding to bind the
+// mount handle, so we intercept that case and synthesize a directory file.
+type dirAwareFS struct {
+	billy.Filesystem
 }
 
-func (emptyFS) ReadDir(name string) ([]fs.DirEntry, error) {
-	if name == "." {
-		return nil, nil
-	}
-	return nil, &fs.PathError{Op: "readdir", Path: name, Err: fs.ErrNotExist}
+func (d dirAwareFS) Open(filename string) (billy.File, error) {
+	return d.OpenFile(filename, os.O_RDONLY, 0)
 }
 
-func (emptyFS) Glob(pattern string) ([]string, error) { return nil, nil }
+func (d dirAwareFS) OpenFile(filename string, flag int, perm os.FileMode) (billy.File, error) {
+	if flag&(os.O_WRONLY|os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_APPEND) == 0 {
+		if info, err := d.Filesystem.Stat(filename); err == nil && info.IsDir() {
+			return &dirFile{name: filename}, nil
+		}
+	}
+	return d.Filesystem.OpenFile(filename, flag, perm)
+}
 
-type emptyDir struct{}
+var errIsDir = errors.New("is a directory")
 
-func (emptyDir) Stat() (fs.FileInfo, error)         { return emptyDirInfo{}, nil }
-func (emptyDir) Read(_ []byte) (int, error)         { return 0, &fs.PathError{Op: "read", Path: ".", Err: fs.ErrInvalid} }
-func (emptyDir) Close() error                       { return nil }
-func (emptyDir) ReadDir(_ int) ([]fs.DirEntry, error) { return nil, nil }
+// dirFile is the placeholder billy.File handed back for directory opens. The
+// kefka billyfs adapter only consults the file's Name() to satisfy Stat,
+// IsDir, and Readdir on the underlying filesystem — it never reads or writes
+// a directory handle directly — so I/O methods can safely return errors.
+type dirFile struct {
+	name string
+}
 
-type emptyDirInfo struct{}
-
-func (emptyDirInfo) Name() string       { return "." }
-func (emptyDirInfo) Size() int64        { return 0 }
-func (emptyDirInfo) Mode() fs.FileMode  { return fs.ModeDir | 0555 }
-func (emptyDirInfo) ModTime() time.Time { return time.Time{} }
-func (emptyDirInfo) IsDir() bool        { return true }
-func (emptyDirInfo) Sys() any           { return nil }
+func (f *dirFile) Name() string                          { return f.name }
+func (f *dirFile) Read(_ []byte) (int, error)            { return 0, errIsDir }
+func (f *dirFile) Write(_ []byte) (int, error)           { return 0, errIsDir }
+func (f *dirFile) ReadAt(_ []byte, _ int64) (int, error) { return 0, errIsDir }
+func (f *dirFile) Seek(_ int64, _ int) (int64, error)    { return 0, errIsDir }
+func (f *dirFile) Close() error                          { return nil }
+func (f *dirFile) Lock() error                           { return nil }
+func (f *dirFile) Unlock() error                         { return nil }
+func (f *dirFile) Truncate(_ int64) error                { return errIsDir }

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
 
+	"github.com/go-git/go-billy/v5"
 	"github.com/openai/openai-go/v3"
 	"github.com/tigrisdata-community/mithras/internal/codeinterpreter/python"
 )
@@ -58,7 +58,7 @@ func (Impl) Valid(data []byte) error {
 	return i.Valid()
 }
 
-func (Impl) Run(ctx context.Context, fsys fs.FS, data []byte) ([]byte, error) {
+func (Impl) Run(ctx context.Context, fsys billy.Filesystem, data []byte) ([]byte, error) {
 	var i Input
 	if err := json.Unmarshal(data, &i); err != nil {
 		return nil, fmt.Errorf("can't parse json: %w", err)
