@@ -62,15 +62,22 @@ func run() error {
 		return fmt.Errorf("can't lookup credentials secret %q: %w", agent.Spec.CredsSecret, err)
 	}
 
-	webhookSecret, err := k8s.Lookup[corev1.Secret](k8s.ResourceIdentifier{
+	existing, err := k8s.Lookup[corev1.Secret](k8s.ResourceIdentifier{
 		ApiVersion: "v1",
 		Kind:       "Secret",
 		Name:       agent.Name + "-webhook-secret",
 		Namespace:  agent.Namespace,
 	})
-	if err != nil {
-		webhookSecret = makeWebhookSecret(agent)
+	if err != nil && !k8s.IsErrNotFound(err) {
+		return fmt.Errorf("can't lookup webhook secret %q: %w", agent.Name+"-webhook-secret", err)
 	}
+
+	sharedSecret := existingSharedSecret(existing)
+	if sharedSecret == "" {
+		sharedSecret = uuid.Must(uuid.NewV7()).String()
+	}
+
+	webhookSecret := makeWebhookSecret(agent, sharedSecret)
 
 	result := make([]any, 0)
 
@@ -193,19 +200,23 @@ func makeDeployment(a agentv1alpha1.Agent) *appsv1.Deployment {
 									Name:  "BIND",
 									Value: ":8080",
 								},
+								{
+									Name: "WEBHOOK_SHARED_SECRET",
+									ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: a.Name + "-webhook-secret",
+											},
+											Key: "WEBHOOK_SHARED_SECRET",
+										},
+									},
+								},
 							},
 							EnvFrom: []corev1.EnvFromSource{
 								{
 									SecretRef: &corev1.SecretEnvSource{
 										LocalObjectReference: corev1.LocalObjectReference{
 											Name: a.Spec.CredsSecret,
-										},
-									},
-								},
-								{
-									SecretRef: &corev1.SecretEnvSource{
-										LocalObjectReference: corev1.LocalObjectReference{
-											Name: a.Name + "-webhook-secret",
 										},
 									},
 								},
@@ -352,17 +363,29 @@ func mkTLSSecretName(domain string) string {
 	return fmt.Sprintf("%s-public-tls", strings.ReplaceAll(domain, ".", "-"))
 }
 
-func makeWebhookSecret(a agentv1alpha1.Agent) *corev1.Secret {
+func makeWebhookSecret(a agentv1alpha1.Agent, sharedSecret string) *corev1.Secret {
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
 			Kind:       "Secret",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: a.Name + "-webhook-secret",
+			Name:        a.Name + "-webhook-secret",
+			Namespace:   a.Namespace,
+			Labels:      a.Labels,
+			Annotations: a.Annotations,
 		},
 		StringData: map[string]string{
-			"WEBHOOK_SHARED_SECRET": uuid.Must(uuid.NewV7()).String(),
+			"WEBHOOK_SHARED_SECRET": sharedSecret,
 		},
 	}
+}
+
+// existingSharedSecret returns the WEBHOOK_SHARED_SECRET value from a previously
+// reconciled Secret so reconciliations don't churn the value on every apply.
+func existingSharedSecret(sec *corev1.Secret) string {
+	if sec == nil {
+		return ""
+	}
+	return string(sec.Data["WEBHOOK_SHARED_SECRET"])
 }
