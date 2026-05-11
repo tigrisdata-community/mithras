@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/tigrisdata-community/mithras/internal/agentloop"
+	bashtool "github.com/tigrisdata-community/mithras/internal/tools/bash"
 	pythontool "github.com/tigrisdata-community/mithras/internal/tools/python"
 )
 
@@ -17,6 +18,7 @@ var ErrUnknownTool = errors.New("webhook: tool not in built-in registry")
 // may mutate it freely.
 func BuiltinTools() map[string]agentloop.Tool {
 	return map[string]agentloop.Tool{
+		"bash":   bashtool.Impl{},
 		"python": pythontool.Impl{},
 	}
 }

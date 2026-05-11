@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-git/go-billy/v5"
 	"github.com/openai/openai-go/v3"
+	bashexec "github.com/tigrisdata-community/mithras/internal/codeinterpreter/bash"
 )
 
 var (
@@ -58,8 +59,20 @@ func (Impl) Valid(data []byte) error {
 }
 
 func (Impl) Run(ctx context.Context, fsys billy.Filesystem, data []byte) ([]byte, error) {
-	_ = ctx
-	_ = fsys
-	_ = data
-	return nil, errors.New("bash: not implemented")
+	var i Input
+	if err := json.Unmarshal(data, &i); err != nil {
+		return nil, fmt.Errorf("can't parse json: %w", err)
+	}
+
+	result, err := bashexec.Run(ctx, fsys, i.Command)
+	if err != nil {
+		return nil, fmt.Errorf("can't execute bash: %w", err)
+	}
+
+	resultBytes, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("can't marshal result bytes: %w", err)
+	}
+
+	return resultBytes, nil
 }

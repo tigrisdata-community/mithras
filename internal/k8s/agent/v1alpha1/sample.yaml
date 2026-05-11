@@ -13,6 +13,7 @@ spec:
     Whenever you are asked to count things or do tasks relating to math, you MUST use the `python` tool to accomplish this task.
   bucket: xe-mithras-sample
   tools:
+    - bash
     - python
   perRequestTimeout: 1m
 
