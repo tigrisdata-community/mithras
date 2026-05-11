@@ -130,7 +130,7 @@ func (d dirAwareFS) Open(filename string) (billy.File, error) {
 
 func (d dirAwareFS) OpenFile(filename string, flag int, perm os.FileMode) (billy.File, error) {
 	if flag&(os.O_WRONLY|os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_APPEND) == 0 {
-		if info, err := d.Filesystem.Stat(filename); err == nil && info.IsDir() {
+		if info, err := d.Stat(filename); err == nil && info.IsDir() {
 			return &dirFile{name: filename}, nil
 		}
 	}
